@@ -1,8 +1,8 @@
 # Author: Sturza Mihai
 # Depedencies: None - all come installed with python
-# Version: 0.2.1 - Updated 2018-02-11 16:15:14
+# Version: 0.3.3 - Updated 2018-02-11 19:18:00
 
-import os, sys, json, socket, getpass, threading, datetime, platform, urllib.request, subprocess
+import os, sys, json, socket, getpass, threading, datetime, platform, urllib.request, subprocess, time
 
 def portConnect(port:int, delay:int, output:list):
     sock = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
@@ -34,14 +34,24 @@ def portData():
 
     for i in range(65530):
         threads[i].join()
-
+    print("\033[92m---PORTS---\n")
     for i in range(65530):
         if output[i] == True:
-            print("\033[91mPort: \033[93m{0} \033[91m(OPEN)\n".format(i))
+            print(" \033[91mPort: \033[93m{0} \033[91m(OPEN)\n".format(i))
             openPorts += 1
-    print("\033[91mOpen Ports: \033[93m{}\n".format(openPorts))
+    print(" \033[91mOpen Ports: \033[93m{}\n".format(openPorts))
 
-
+def internetData():
+    sock = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
+    ip = socket.gethostbyname('google.com')
+    print("\033[92m---CONNECTION---\n")
+    try:
+        now = time.time()
+        sock.connect((ip,80))
+    except:
+        print("\033[91mERROR: \033[93mYou are not connected to the internet.\n")
+    delta = (time.time() - now)*10000
+    print("\033[91mPing: \033[93mIt took {0} ms to reach 'google.com'\n".format(delta))
 
 def osData():
     print("\033[91mUsername: \033[93m{0}\n\033[91mProcessor: \033[93m{1}\n\033[91mArchitecture: \033[93m{2}\n\033[91mLinux Distro: \033[93m{3}\n\033[91mNetwork Node: \033[93m{4}\n\033[91mSystem Time: \033[93m{5}\n".format(getpass.getuser(),platform.processor(),platform.machine(),platform.linux_distribution(),platform.node(),datetime.datetime.now()))
@@ -67,5 +77,6 @@ if __name__ == "__main__":
     try:
         ipData()
         portData()
+        internetData()
     except:
         print("\033[91mCould not retrive Network Data.\n")
