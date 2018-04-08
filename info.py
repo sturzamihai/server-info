@@ -1,82 +1,114 @@
-# Author: Sturza Mihai
-# Depedencies: None - all come installed with python
-# Version: 0.3.3 - Updated 2018-02-11 19:18:00
+#   last updated: 06.04.2018. v0.1.2
+#   
+#   developed by: mihai sturza.
+#   ~ simple tool for determining useful information about the server you connected to. ~
+#   ? will work on most python versions. ?
 
-import os, sys, json, socket, getpass, threading, datetime, platform, urllib.request, subprocess, time
+#imports
+from __future__ import print_function
+from collections import OrderedDict
+import json, os, platform, subprocess, sys, getpass
+try:
+    from urllib.request import urlopen
+except ImportError:
+    from urllib2 import urlopen
 
-def portConnect(port:int, delay:int, output:list):
-    sock = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
-    socket.setdefaulttimeout(delay)
+# class for stylized printing
+"""
+class tcolors:
+    DEFAULT = '\033[39m'
+    RED = '\033[91m'
+    WARNING = '\033[93m'    # will use those later
+    FAIL = '\033[91m'
+    BOLD = '\033[1m'
+    UNDERLINE = '\033[4m'    
+"""
+
+ipshow = False
+
+def check_args():
+    for args in sys.argv:
+        if(args == '-h' or args == "--help"):
+            print_help()
+            sys.exit()
+        elif(args == '-ip'):
+            global ipshow
+            ipshow = True
+
+
+def print_help():
+    print("Optional arguments:\n")
+    print("-h, --help: Shows this dialog and kills the program.")
+    print("-ip: Shows the machine's public IP in the 'Connection' section.")
+
+def print_ip_info():
+    # internet connection
     try:
-        sock.connect(('127.0.0.1',port))
-        output[port] = True
+        ipinfo = json.loads(urlopen("http://ipinfo.io/json").read().decode('utf-8'))
+        if ipshow == True:
+            print("[*] IP: {}".format(ipinfo['ip']))
+        print("[*] COUNTRY: {0}\n[*] CITY: {1}\n[*] ORG: {2}".format(ipinfo['country'],ipinfo['city'],ipinfo['org']))
     except:
-        output[port] = False
+        print("[*] You are not connected to the internet.")
 
-def ipData():
-    ipjson = json.loads(urllib.request.urlopen("http://ipinfo.io/json").read().decode('utf-8'))
-
-    print("\033[91mIP: \033[93m{0}\n\033[91mCountry: \033[93m{1}\n\033[91mISP: \033[93m{2}\n".format(str(ipjson['ip']),str(ipjson['country']),str(ipjson['org'])))
-
-
-def portData():
-
-    threads = []
-    output = {}
-    openPorts = 0
-
-    for i in range(65530):
-        t = threading.Thread(target=portConnect,args=(i,1,output))
-        threads.append(t)
-
-    for i in range(65530):
-        threads[i].start()
-
-    for i in range(65530):
-        threads[i].join()
-    print("\033[92m---PORTS---\n")
-    for i in range(65530):
-        if output[i] == True:
-            print(" \033[91mPort: \033[93m{0} \033[91m(OPEN)\n".format(i))
-            openPorts += 1
-    print(" \033[91mOpen Ports: \033[93m{}\n".format(openPorts))
-
-def internetData():
-    sock = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
-    ip = socket.gethostbyname('google.com')
-    print("\033[92m---CONNECTION---\n")
-    try:
-        now = time.time()
-        sock.connect((ip,80))
-    except:
-        print("\033[91mERROR: \033[93mYou are not connected to the internet.\n")
-    delta = (time.time() - now)*10000
-    print("\033[91mPing: \033[93mIt took {0} ms to reach 'google.com'\n".format(delta))
-
-def osData():
-    print("\033[91mUsername: \033[93m{0}\n\033[91mProcessor: \033[93m{1}\n\033[91mArchitecture: \033[93m{2}\n\033[91mLinux Distro: \033[93m{3}\n\033[91mNetwork Node: \033[93m{4}\n\033[91mSystem Time: \033[93m{5}\n".format(getpass.getuser(),platform.processor(),platform.machine(),platform.linux_distribution(),platform.node(),datetime.datetime.now()))
-
-def timeData():
-    raw = subprocess.check_output('uptime').decode('utf-8').replace(',','')
-    days = int(raw.split()[2])
-    if 'min' in raw:
-    	hours = 0
-    	minutes = int(raw[4])
+def print_sudo_access():
+    # 'super-user do' acces
+    if os.getuid() or getpass.getuser()=="root":
+        print("[*] SUDO: YES")
     else:
-    	hours, minutes = map(int,raw.split()[4].split(':'))
-    print("\033[91mUp-time: \033[93m{0} days, {1} hours,{2} minutes\n".format(days,hours,minutes))
+        print("[*] SUDO: NO")
+
+def print_specs():
+    # os info
+    distro = platform.linux_distribution()
+    print("[*] OS: {}".format(platform.system()))
+    print("[*] Distribution: {0} {1} ({2})".format(distro[0],distro[1],distro[2]))
+    cpu = get_processor_info()
+    print("[*] CPU: {}".format(cpu))
+    ram = get_ram_info()
+    print("[*] RAM: {}".format(ram))
+
+def ram_info():
+    meminfo = OrderedDict()
+    with open('/proc/meminfo') as f:
+        for line in f:
+            meminfo[line.split(':')[0]] = line.split(':')[1].strip()
+    return meminfo
+
+def get_ram_info():
+    raminfo = ram_info()
+    return raminfo['MemTotal']
+
+def processor_info():
+    cpuinfo=OrderedDict()
+    procinfo=OrderedDict()
+    nprocs = 0
+    with open('/proc/cpuinfo') as f:
+        for line in f:
+            if not line.strip():
+                cpuinfo['proc%s' % nprocs] = procinfo
+                nprocs = nprocs + 1
+                procinfo = OrderedDict()
+            else:
+                if len(line.split(':')) == 2:
+                    procinfo[line.split(':')[0].strip()] = line.split(':')[1].strip()
+                else:
+                    procinfo[line.split(':')[0].strip()] = ''
+    return cpuinfo
+
+def get_processor_info():
+    cpuinfo = processor_info()
+    num = 0
+    for processor in cpuinfo.keys():
+        num = num + 1
+    for processor in cpuinfo.keys():
+        return "{0}x {1}".format(num,cpuinfo[processor]['model name'])
+
 if __name__ == "__main__":
-    print("\033[92m===HOST-INFO===\n")
-    try:
-        osData()
-        timeData()
-        print("\033[92m===NETWORK-INFO===\n")
-    except:
-        print("\033[91mCould not retrive OS Data.\n")
-        print("\033[92m===NETWORK-INFO===\n")
-    try:
-        ipData()
-        portData()
-        internetData()
-    except:
-        print("\033[91mCould not retrive Network Data.\n")
+    check_args()
+    print(" -- Permissions")
+    print_sudo_access()
+    print(' -- Machine Info')
+    print_specs()
+    print(" -- Connection")
+    print_ip_info()
